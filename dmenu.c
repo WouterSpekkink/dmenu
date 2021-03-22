@@ -28,7 +28,7 @@
 
 /* enums */
 enum { SchemeNorm, SchemeSel, SchemeNormHighlight, SchemeSelHighlight,
-       SchemeOut, SchemeLast }; /* color schemes */
+SchemeOut, SchemeLast }; /* color schemes */
 
 
 struct item {
@@ -433,7 +433,7 @@ fuzzymatch(void)
 		/* rebuild list of matches */
 		matches = matchend = NULL;
 		for (i = 0, it = fuzzymatches[i];  i < number_of_matches && it && \
-				it->text; i++, it = fuzzymatches[i]) {
+				 it->text; i++, it = fuzzymatches[i]) {
 			appenditem(it, &matches, &matchend);
 		}
 		free(fuzzymatches);
