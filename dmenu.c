@@ -26,7 +26,7 @@
 #define LENGTH(X)             (sizeof X / sizeof X[0])
 #define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
 
-	/* enums */
+/* enums */
 enum { SchemeNorm, SchemeSel, SchemeNormHighlight, SchemeSelHighlight,
        SchemeOut, SchemeLast }; /* color schemes */
 
@@ -361,86 +361,6 @@ fuzzymatch(void)
   curr = sel = matches;
   calcoffsets();
 }
-int
-compare_distance(const void *a, const void *b)
-{
-  struct item *da = *(struct item **) a;
-  struct item *db = *(struct item **) b;
-
-  if (!db)
-    return 1;
-  if (!da)
-    return -1;
-
-  return da->distance == db->distance ? 0 : da->distance < db->distance ? -1 : 1;
-}
-
-void
-fuzzymatch(void)
-{
-  /* bang - we have so much memory */
-  struct item *it;
-  struct item **fuzzymatches = NULL;
-  char c;
-  int number_of_matches = 0, i, pidx, sidx, eidx;
-  int text_len = strlen(text), itext_len;
-
-  matches = matchend = NULL;
-
-  /* walk through all items */
-  for (it = items; it && it->text; it++) {
-    if (text_len) {
-      itext_len = strlen(it->text);
-      pidx = 0; /* pointer */
-      sidx = eidx = -1; /* start of match, end of match */
-			/* walk through item text */
-      for (i = 0; i < itext_len && (c = it->text[i]); i++) {
-	/* fuzzy match pattern */
-	if (!fstrncmp(&text[pidx], &c, 1)) {
-	  if(sidx == -1)
-	    sidx = i;
-	  pidx++;
-	  if (pidx == text_len) {
-	    eidx = i;
-	    break;
-	  }
-	}
-      }
-      /* build list of matches */
-      if (eidx != -1) {
-	/* compute distance */
-	/* add penalty if match starts late (log(sidx+2))
-	 * add penalty for long a match without many matching characters */
-	it->distance = log(sidx + 2) + (double)(eidx - sidx - text_len);
-	/* fprintf(stderr, "distance %s %f\n", it->text, it->distance); */
-	appenditem(it, &matches, &matchend);
-	number_of_matches++;
-      }
-    } else {
-      appenditem(it, &matches, &matchend);
-    }
-  }
-
-  if (number_of_matches) {
-    /* initialize array with matches */
-    if (!(fuzzymatches = realloc(fuzzymatches, number_of_matches * sizeof(struct item*))))
-      die("cannot realloc %u bytes:", number_of_matches * sizeof(struct item*));
-    for (i = 0, it = matches; it && i < number_of_matches; i++, it = it->right) {
-      fuzzymatches[i] = it;
-    }
-    /* sort matches according to distance */
-    qsort(fuzzymatches, number_of_matches, sizeof(struct item*), compare_distance);
-    /* rebuild list of matches */
-    matches = matchend = NULL;
-    for (i = 0, it = fuzzymatches[i];  i < number_of_matches && it && \
-	   it->text; i++, it = fuzzymatches[i]) {
-      appenditem(it, &matches, &matchend);
-    }
-    free(fuzzymatches);
-  }
-  curr = sel = matches;
-  calcoffsets();
-}
 
 static void
 match(void)
@@ -622,116 +542,125 @@ keypress(XKeyEvent *ev)
     case XK_h: ksym = XK_Up;    break;
     case XK_j: ksym = XK_Next;  break;
     case XK_k: ksym = XK_Prior; break;
-      cas`e XK_l: ksym = XK_Down;  break;
+    case XK_l: ksym = XK_Down;  break;
     default:
       return;
     }
   }
   switch(ksym) {
-    cursor = nextrune(+1);
-    /* fallthrough */
-  case XK_BackSpace:
-    if (cursor == 0)
-      return;
-    insert(NULL, nextrune(-1) - cursor);
+  default:
+  insert:
+    if (!iscntrl((unsigned char)*buf))
+    insert(buf, len);
     break;
-  case XK_End:
-  case XK_KP_End:
-    if (text[cursor] != '\0') {
-      cursor = strlen(text);
-      break;
-    }
-    if (next) {
-      /* jump to end of list and position items in reverse */
-      curr = matchend;
-      calcoffsets();
-      curr = prev;
-      calcoffsets();
-      while (next && (curr = curr->right))
-	calcoffsets();
-    }
-    sel = matchend;
-    break;
-  case XK_Escape:
-    cleanup();
-    exit(1);
-  case XK_Home:
-  case XK_KP_Home
-    if (sel == matches) {
-      cursor = 0;
-      break;
-    }
-  sel = curr = matches;
-  calcoffsets();
-  break;
-  case XK_Left:
-  case XK_KP_Left:
-    if (cursor > 0 && (!sel || !sel->left || lines > 0)) {
-      cursor = nextrune(-1);
-      break;
-    }
-    if (lines > 0)
-      return;
-    /* fallthrough */
-  case XK_Up:
-  case XK_KP_Up:
-    if (sel && sel->left && (sel = sel->left)->right == curr) {
-      curr = prev;
-      calcoffsets();
-    }
-    break;
-  case XK_Next:
-  case XK_KP_Next:
-    if (!next)
-      return;
-    sel = curr = next;
-    calcoffsets();
-    break;
-  case XK_Prior:
-  case XK_KP_Prior:
-    if (!prev)
-      return;
-    sel = curr = prev;
-    calcoffsets();
-    break;
-  case XK_Return:
-  case XK_KP_Enter:
-    puts((sel && !(ev->state & ShiftMask)) ? sel->text : text);
-    if (!(ev->state & ControlMask)) {
-      cleanup();
-      exit(0);
-    }
-    if (sel)
-      sel->out = 1;
-    break;
-  case XK_Right:
-  case XK_KP_Right:
-    if (text[cursor] != '\0') {
-      cursor = nextrune(+1);
-      break;
-    }
-    if (lines > 0)
-      return;
-    /* fallthrough */
-  case XK_Down:
-  case XK_KP_Down:
-    if (sel && sel->right && (sel = sel->right) == next) {
-      curr = next;
-      calcoffsets();
-    }
-    break;
-  case XK_Tab:
-    if (!sel)
-      return;
-    cursor = strnlen(sel->text, sizeof text - 1);
-    memcpy(text, sel->text, cursor);
-    text[cursor] = '\0';
-    match();
-    break;
-  }
+    case XK_Delete:
+      case XK_KP_Delete:
+	if (text[cursor] == '\0')
+	  return;
+	cursor = nextrune(+1);
+	/* fallthrough */
+	case XK_BackSpace:
+	  if (cursor == 0)
+	    return;
+	  insert(NULL, nextrune(-1) - cursor);
+	  break;
+	  case XK_End:
+	    case XK_KP_End:
+	      if (text[cursor] != '\0') {
+		cursor = strlen(text);
+		break;
+	      }
+	      if (next) {
+		/* jump to end of list and position items in reverse */
+		curr = matchend;
+		calcoffsets();
+		curr = prev;
+		calcoffsets();
+		while (next && (curr = curr->right))
+		  calcoffsets();
+	      }
+	      sel = matchend;
+	      break;
+	      case XK_Escape:
+		cleanup();
+		exit(1);
+		case XK_Home:
+		  case XK_KP_Home:
+		    if (sel == matches) {
+		      cursor = 0;
+		      break;
+		    }
+		    sel = curr = matches;
+		    calcoffsets();
+		    break;
+		    case XK_Left:
+		      case XK_KP_Left:
+			if (cursor > 0 && (!sel || !sel->left || lines > 0)) {
+			  cursor = nextrune(-1);
+			  break;
+			}
+			if (lines > 0)
+			  return;
+			/* fallthrough */
+			case XK_Up:
+			  case XK_KP_Up:
+			    if (sel && sel->left && (sel = sel->left)->right == curr) {
+			      curr = prev;
+			      calcoffsets();
+			    }
+			    break;
+			    case XK_Next:
+			      case XK_KP_Next:
+				if (!next)
+				  return;
+				sel = curr = next;
+				calcoffsets();
+				break;
+				case XK_Prior:
+				  case XK_KP_Prior:
+				    if (!prev)
+				      return;
+				    sel = curr = prev;
+				    calcoffsets();
+				    break;
+				    case XK_Return:
+				      case XK_KP_Enter:
+					puts((sel && !(ev->state & ShiftMask)) ? sel->text : text);
+					if (!(ev->state & ControlMask)) {
+					  cleanup();
+					  exit(0);
+					}
+					if (sel)
+					  sel->out = 1;
+					break;
+					case XK_Right:
+					  case XK_KP_Right:
+					    if (text[cursor] != '\0') {
+					      cursor = nextrune(+1);
+					      break;
+					    }
+					    if (lines > 0)
+					      return;
+					    /* fallthrough */
+					    case XK_Down:
+					      case XK_KP_Down:
+						if (sel && sel->right && (sel = sel->right) == next) {
+						  curr = next;
+						  calcoffsets();
+						}
+						break;
+						case XK_Tab:
+						  if (!sel)
+						    return;
+						  cursor = strnlen(sel->text, sizeof text - 1);
+						  memcpy(text, sel->text, cursor);
+						  text[cursor] = '\0';
+						  match();
+						  break;
+}
 
- draw:
-  drawmenu();
+draw:
+drawmenu();
 }
 
 static void
