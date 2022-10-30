@@ -693,19 +693,21 @@ readstdin(void)
     return;
   }
 
-  /* read each line from stdin and add it to the item list */
-  for (i = 0; (len = getline(&line, &junk, stdin)) != -1; i++, line = NULL) {
-    if (i + 1 >= size / sizeof *items)
-      if (!(items = realloc(items, (size += BUFSIZ))))
-	die("cannot realloc %zu bytes:", size);
-    if (line[len - 1] == '\n')
-      line[len - 1] = '\0';
-    items[i].text = line;
-    items[i].out = 0;
-  }
-  if (items)
-    items[i].text = NULL;
-  lines = MIN(lines, i);
+	/* read each line from stdin and add it to the item list */
+	for (i = 0; (len = getline(&line, &junk, stdin)) != -1; i++) {
+		if (i + 1 >= size / sizeof *items)
+			if (!(items = realloc(items, (size += BUFSIZ))))
+				die("cannot realloc %zu bytes:", size);
+		if (line[len - 1] == '\n')
+			line[len - 1] = '\0';
+		items[i].text = line;
+		items[i].out = 0;
+		line = NULL;
+	}
+	free(line);
+	if (items)
+		items[i].text = NULL;
+	lines = MIN(lines, i);
 }
 
 static void
