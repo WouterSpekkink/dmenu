@@ -465,7 +465,7 @@ keypress(XKeyEvent *ev)
 {
   char buf[64];
   int len;
-  KeySym ksym = noSymbol;
+  KeySym ksym = NoSymbol;
   Status status;
 
   len = XmbLookupString(xic, ev, buf, sizeof buf, &ksym, &status);
